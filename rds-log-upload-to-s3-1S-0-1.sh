@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ######################################################
-# version 1S.0.1 2018-11-20
+# version 1S.0.1 2018-12-17
 # Single File Version
 # Derived from https://github.com/aws/aws-cli/issues/2268
 # usage bash ./rds-log-upload-to-s3.sh RDSInstanceName postgresql.log.2017-02-09-15
@@ -13,31 +13,7 @@
 # Configuring the CLI http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
 ######################################################
 
-#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
-#++++++++++++Outline++++++++++++++++++
-#*script usage
-#*verify inputs
-#*verify RDS instance
-#-local sub directory
-#*verify bucket
-#-create bucket if not exist
-#-get list of logs on RDS instance
-#*DL log file ****prototyped
-#*Upload to S3
-#*verify file
-#-write activity log
-#-cleanup
-#------------Outline------------------ 
-#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
 
-#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
-# ###########DBcredentials
-# user=$1
-# password=$2
-# databasename=$3
-# hostname=$4
-# BUCKETNAME=$5
-#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
 
 #++++++++++++script usage++++++++++++
 #Script usage - invoked with -h or --help or no parameters
@@ -59,10 +35,40 @@ FILE=$2
 BUCKETNAME=$3
 #------------Input Paramters------------
 
+#++++++++++++Initialize variables+++++++++++
+MESSAGE=""
+working_path="${HOME}/rds_logfile"
+date_string=`date -u '+%Y-%m-%d-%H%M%S'`
+#------------Initialize variables-----------
+
+#++++++++++++create rds_log_directory++++++++++++
+#create dir and permissions
+if [ -e $working_path ]
+	then
+	:
+else
+	mkdir $working_path
+	umask 177 
+fi
+#------------create rds_log_directory------------
+
+############### FUNCTIONS #################
+
+#++++++++++++Write to log file+++++++++++++
+WRITETOLOG() {
+	local MESSAGE=$1
+	echo "$MESSAGE" >> ${working_path}/${date_string}.output
+}
+#------------Write to log file-------------
+
+############### FUNCTIONS #################
+
 #++++++++++++Test Input Paramters++++++++++++
 if [ "$1" == "" ] || [ "$2" == "" ] || [ "$3" == "" ];
 then
 	echo "usage: scriptname.sh RDSInstanceName LogFileName BucketName";
+	WRITETOLOG "Missing one of the following parameters RDSInstanceName = $1, LogFileName = $2, BucketName = $3\
+	usage: scriptname.sh RDSInstanceName LogFileName BucketName"
 	exit 1;
 else
 	:
@@ -79,16 +85,17 @@ then
   if [ $NO_BUCKET_CHECK = 1 ]; then
     echo "Bucket does not exist"
 	BUCKET_EXISTS=false
-	#code here for append to script log - optional
+	WRITETOLOG "Bucket $BUCKETNAME does not exist"
 	exit 1;
   else
 	echo "Error checking S3 Bucket"                     
     echo "$S3_CHECK"
-	#code here for append to script log - optional
+	WRITETOLOG "There was an unknown error checking Bucket $BUCKETNAME"
     exit 1;                 
   fi 
-else                                                                                                                                                                                         
+else                       
   echo "Bucket exists"
+  WRITETOLOG "Status: Bucket $BUCKETNAME exists"
 fi
 #------------Test for bucket------------
 
@@ -102,11 +109,11 @@ EXISTINGINSTANCE=$(aws rds describe-db-instances \
 if [ -z $EXISTINGINSTANCE ]
 then
     echo "RDS instance $RDSINSTANCENAME does not exist! ..exiting"
-	#code here for append to script log - optional
+	WRITETOLOG "RDS instance $RDSINSTANCENAME does not exist! ..exiting"
 	exit 1;
 else
     echo "instance $RDSINSTANCENAME exists"
-	#code here for append to script log - optional
+	WRITETOLOG "Status: RDS instance $RDSINSTANCENAME exists"
 fi
 #------------Test for RDS Instance------------
 
@@ -118,21 +125,13 @@ LOGFILEEXISTS=$(aws rds describe-db-log-files --db-instance-identifier $RDSINSTA
 if [ -z $LOGFILEEXISTS ]
 then
     echo "RDS instance log file $FILE not found! ..exiting"
-	#code here for append to script log - optional
+	WRITETOLOG "RDS instance log file $FILE not found! ..exiting"
 	exit 1;
 else
     echo "log file $FILE exists"
-	#code here for append to script log - optional
+	WRITETOLOG "Status: RDS instance log file $FILE found"
 fi
 #------------Test for log file on RDS Instance------------
-
-# ###########Other options
-# backup_path="${HOME}/mysql_backup"
-# date=$(date +"%d-%b-%Y")
-
-# ###########create dir and permissions
-# mkdir $backup_path
-# umask 177 
 
 #++++++++++++log download+++++++++++++
 COUNTER=1
@@ -142,8 +141,9 @@ PREVIOUSTOKEN=0
 rm -f ${FILE}
 
 while [  $COUNTER -lt 10000 ]; do
-	echo "Lets try and get ${FILE}.${COUNTER}"
+	echo "Getting ${FILE}.${COUNTER}"
 	echo "The starting-token will be set to ${LASTFOUNDTOKEN}"
+	WRITETOLOG "Getting ${FILE}.${COUNTER}. starting-token will be set to ${LASTFOUNDTOKEN}"
 	PREVIOUSTOKEN=${LASTFOUNDTOKEN}
 	
 	#NOTE!!!!! --log-file-name error/${FILE} is specific to RDS postgres "error" directory and must be mondified to work with other RDS engine types
@@ -152,15 +152,18 @@ while [  $COUNTER -lt 10000 ]; do
 	
 	echo "LASTFOUNDTOKEN is ${LASTFOUNDTOKEN}"
 	echo "PREVIOUSTOKEN is ${PREVIOUSTOKEN}"
+	WRITETOLOG "LASTFOUNDTOKEN is ${LASTFOUNDTOKEN} / PREVIOUSTOKEN is ${PREVIOUSTOKEN}"
 	
 	if [ ${PREVIOUSTOKEN} == ${LASTFOUNDTOKEN} ]; then
 		echo "No more new markers, exiting"
+		WRITETOLOG "No more new markers, exiting"
 		rm -f ${FILE}.${COUNTER}.debug
 		rm -f ${FILE}.${COUNTER}
 		break;
 	else
 		echo "Marker is ${LASTFOUNDTOKEN} more to come ... "
 		echo " "
+		WRITETOLOG "Marker is ${LASTFOUNDTOKEN} more to come ... "
 		rm -f ${FILE}.${COUNTER}.debug
 		PREVIOUSTOKEN=${LASTFOUNDTOKEN}
 	fi
@@ -174,6 +177,9 @@ done
 
 #++++++++++++upload log to s3+++++++++++++
 aws s3 cp $FILE s3://$BUCKETNAME
+echo "Status: writing $FILE to s3://$BUCKETNAME"
+WRITETOLOG "Status: writing $FILE to s3://$BUCKETNAME"
+aws s3 cp $working_path/$date_string.output s3://$BUCKETNAME
 #------------upload log to s3-------------
 
 #++++++++++++verify file on s3+++++++++++++
@@ -187,13 +193,9 @@ aws s3 cp $FILE s3://$BUCKETNAME
 #to be written/optional
 #++++++++++++write script log file/status+++++++++++++
 
-#++++++++++++uplaod script log file to s3+++++++++++++
+#++++++++++++upload script log file to s3+++++++++++++
 #to be written/optional
 #++++++++++++delete local file+++++++++++++
 #to be written/optional
 #------------delete local file-------------
-#++++++++++++uplaod script log file to s3+++++++++++++
-
-
-
-
+#++++++++++++upload script log file to s3+++++++++++++

@@ -1,0 +1,25 @@
+#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
+#++++++++++++Outline++++++++++++++++++
+#*script usage
+#*verify inputs
+#*verify RDS instance
+#-local sub directory
+#*verify bucket
+#-create bucket if not exist
+#-get list of logs on RDS instance
+#*DL log file ****prototyped
+#*Upload to S3
+#*verify file
+#-write activity log
+#-cleanup
+#------------Outline------------------ 
+#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
+
+#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
+# ###########DBcredentials
+# user=$1
+# password=$2
+# databasename=$3
+# hostname=$4
+# BUCKETNAME=$5
+#REMOVE FROM PUBLISHED FILE - REMOVE FROM PUBLISHED FILE
